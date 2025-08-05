@@ -1,0 +1,41 @@
+# Secure Media Upload Directory
+# Block PHP execution and script uploads
+
+# Disable PHP execution
+<Files *.php>
+    Order allow,deny
+    Deny from all
+</Files>
+
+# Block common script files
+<FilesMatch "\.(php|phtml|php3|php4|php5|pl|py|jsp|asp|sh|cgi)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Allow only specific file types
+<FilesMatch "\.(jpg|jpeg|png|gif|webp|pdf|doc|docx|xls|xlsx|ppt|pptx|mp4|webm|mov|mp3|wav|ogg)$">
+    Order allow,deny
+    Allow from all
+</FilesMatch>
+
+# Prevent access to sensitive files
+<FilesMatch "^\.">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Add security headers
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options nosniff
+    Header set X-Frame-Options SAMEORIGIN
+    Header set X-XSS-Protection "1; mode=block"
+</IfModule>
+
+# Set max file size (adjust as needed)
+LimitRequestBody 10485760
+
+# Prevent hotlinking (optional)
+# RewriteEngine on
+# RewriteCond %{HTTP_REFERER} !^http(s)?://(www\.)?yourdomain\.com [NC]
+# RewriteRule \.(jpg|jpeg|png|gif)$ - [NC,F,L]

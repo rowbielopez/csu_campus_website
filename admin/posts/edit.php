@@ -1,0 +1,899 @@
+<?php
+/**
+ * Edit Post
+ * WYSIWYG editor with role-based publishing workflow
+ */
+
+// Define admin access
+define('ADMIN_ACCESS', true);
+
+// Load core authentication
+require_once __DIR__ . '/../../core/middleware/auth.php';
+require_once __DIR__ . '/../../core/functions/auth.php';
+require_once __DIR__ . '/../../core/functions/utilities.php';
+require_once __DIR__ . '/../../config/config.php';
+
+// Get current user and campus
+$current_user = get_logged_in_user();
+$current_campus = get_current_campus();
+$db = Database::getInstance();
+
+// Get available categories for dropdown
+$categories = $db->fetchAll("SELECT id, name, parent_id FROM categories WHERE campus_id = ? AND is_active = 1 ORDER BY sort_order ASC, name ASC", [current_campus_id()]);
+
+// Build hierarchical options
+function buildCategoryOptions($categories, $parent_id = null, $level = 0) {
+    $options = [];
+    foreach ($categories as $category) {
+        if ($category['parent_id'] == $parent_id) {
+            $indent = str_repeat('&nbsp;&nbsp;&nbsp;', $level);
+            $options[] = [
+                'id' => $category['id'],
+                'name' => $indent . $category['name'],
+                'level' => $level
+            ];
+            $options = array_merge($options, buildCategoryOptions($categories, $category['id'], $level + 1));
+        }
+    }
+    return $options;
+}
+
+$category_options = buildCategoryOptions($categories);
+
+// Get popular tags for suggestions
+$popular_tags = $db->fetchAll("SELECT name FROM tags WHERE campus_id = ? AND is_active = 1 ORDER BY usage_count DESC LIMIT 20", [current_campus_id()]);
+
+// Get post ID
+$post_id = intval($_GET['id'] ?? 0);
+
+if (!$post_id) {
+    $_SESSION['flash_message'] = [
+        'type' => 'error',
+        'message' => 'Invalid post ID.'
+    ];
+    header('Location: index.php');
+    exit;
+}
+
+// Get post details with permission check
+$sql = "SELECT * FROM posts WHERE id = ?";
+$params = [$post_id];
+
+// Add campus isolation for non-super admins
+if (!is_super_admin()) {
+    $sql .= " AND campus_id = ?";
+    $params[] = current_campus_id();
+}
+
+$post = $db->fetch($sql, $params);
+
+if (!$post) {
+    $_SESSION['flash_message'] = [
+        'type' => 'error',
+        'message' => 'Post not found or you do not have permission to edit it.'
+    ];
+    header('Location: index.php');
+    exit;
+}
+
+// Get existing categories for this post
+$existing_categories = $db->fetchAll("SELECT category_id FROM post_categories WHERE post_id = ?", [$post_id]);
+$existing_category_ids = array_column($existing_categories, 'category_id');
+
+// Get existing tags for this post
+$existing_tags = $db->fetchAll("
+    SELECT t.name 
+    FROM tags t 
+    INNER JOIN post_tags pt ON t.id = pt.tag_id 
+    WHERE pt.post_id = ?
+    ORDER BY t.name", [$post_id]);
+$existing_tag_names = array_column($existing_tags, 'name');
+
+// Check edit permissions
+$can_edit = false;
+
+// Super admin can edit any post
+if (is_super_admin()) {
+    $can_edit = true;
+}
+// Campus admin can edit any post in their campus
+elseif (is_campus_admin()) {
+    $can_edit = true;
+}
+// Editors can edit any post in their campus
+elseif (is_editor()) {
+    $can_edit = true;
+}
+// Authors can edit their own posts
+elseif ($post['author_id'] == $current_user['id']) {
+    $can_edit = true;
+}
+
+if (!$can_edit) {
+    $_SESSION['flash_message'] = [
+        'type' => 'error',
+        'message' => 'You do not have permission to edit this post.'
+    ];
+    header('Location: index.php');
+    exit;
+}
+
+// Handle form submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $title = trim($_POST['title'] ?? '');
+    $content = $_POST['content'] ?? '';
+    $excerpt = trim($_POST['excerpt'] ?? '');
+    $status = $_POST['status'] ?? $post['status'];
+    $featured = isset($_POST['is_featured']) ? 1 : 0;
+    $category_ids = $_POST['category_ids'] ?? [];
+    $tag_names = array_filter(array_map('trim', explode(',', $_POST['tags'] ?? '')));
+    $meta_title = trim($_POST['meta_title'] ?? '');
+    $meta_description = trim($_POST['meta_description'] ?? '');
+    $featured_image_url = trim($_POST['featured_image_url'] ?? '');
+    
+    $errors = [];
+    
+    // Handle featured image upload
+    if (isset($_FILES['featured_image']) && $_FILES['featured_image']['error'] === UPLOAD_ERR_OK) {
+        $upload_dir = '../../uploads/images/';
+        
+        // Create upload directory if it doesn't exist
+        if (!is_dir($upload_dir)) {
+            mkdir($upload_dir, 0755, true);
+        }
+        
+        $file_extension = strtolower(pathinfo($_FILES['featured_image']['name'], PATHINFO_EXTENSION));
+        $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+        
+        if (in_array($file_extension, $allowed_extensions)) {
+            $filename = 'featured_' . time() . '_' . uniqid() . '.' . $file_extension;
+            $file_path = $upload_dir . $filename;
+            
+            if (move_uploaded_file($_FILES['featured_image']['tmp_name'], $file_path)) {
+                $featured_image_url = '/campus_website2/uploads/images/' . $filename;
+            } else {
+                $errors[] = 'Failed to upload featured image.';
+            }
+        } else {
+            $errors[] = 'Invalid image format. Allowed: JPG, PNG, GIF, WebP.';
+        }
+    }
+    
+    // Validation
+    if (empty($title)) {
+        $errors[] = 'Title is required.';
+    }
+    
+    if (empty($content)) {
+        $errors[] = 'Content is required.';
+    }
+    
+    if (empty($category_ids)) {
+        $errors[] = 'At least one category must be selected.';
+    }
+    
+    // Status validation based on role
+    if ($status === 'published' && !is_campus_admin() && !is_super_admin()) {
+        $status = 'pending'; // Authors can only submit for review
+    }
+    
+    if (empty($errors)) {
+        // Generate slug if title changed
+        $slug = $post['slug'];
+        if ($title !== $post['title']) {
+            $slug = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $title), '-'));
+            
+            // Check for duplicate slug in campus (excluding current post)
+            $existing = $db->fetch("SELECT id FROM posts WHERE slug = ? AND campus_id = ? AND id != ?", [$slug, current_campus_id(), $post_id]);
+            if ($existing) {
+                $slug .= '-' . time();
+            }
+        }
+        
+        // Auto-generate excerpt if not provided
+        if (empty($excerpt)) {
+            $excerpt = substr(strip_tags($content), 0, 150) . '...';
+        }
+        
+        try {
+            $post_data = [
+                'title' => $title,
+                'slug' => $slug,
+                'content' => $content,
+                'excerpt' => $excerpt,
+                'status' => $status,
+                'is_featured' => $featured,
+                'featured_image_url' => $featured_image_url,
+                'meta_title' => $meta_title ?: $title,
+                'meta_description' => $meta_description ?: $excerpt,
+                'updated_at' => date('Y-m-d H:i:s')
+            ];
+            
+            // Set published_at if publishing for the first time
+            if ($status === 'published' && !$post['published_at']) {
+                $post_data['published_at'] = date('Y-m-d H:i:s');
+            }
+            
+            $fields = array_keys($post_data);
+            $set_clause = implode(' = ?, ', $fields) . ' = ?';
+            $params = array_values($post_data);
+            $params[] = $post_id;
+            
+            $sql = "UPDATE posts SET $set_clause WHERE id = ?";
+            $db->query($sql, $params);
+            
+            // Handle categories - remove existing and add new ones
+            $db->query("DELETE FROM post_categories WHERE post_id = ?", [$post_id]);
+            if (!empty($category_ids)) {
+                foreach ($category_ids as $category_id) {
+                    $category_id = intval($category_id);
+                    if ($category_id > 0) {
+                        $db->query("INSERT IGNORE INTO post_categories (post_id, category_id) VALUES (?, ?)", [$post_id, $category_id]);
+                    }
+                }
+            }
+            
+            // Handle tags - remove existing and add new ones
+            $db->query("DELETE FROM post_tags WHERE post_id = ?", [$post_id]);
+            if (!empty($tag_names)) {
+                foreach ($tag_names as $tag_name) {
+                    if (!empty($tag_name)) {
+                        // Create slug for tag
+                        $tag_slug = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $tag_name), '-'));
+                        
+                        // Check if tag exists in campus
+                        $existing_tag = $db->fetch("SELECT id FROM tags WHERE slug = ? AND campus_id = ?", [$tag_slug, current_campus_id()]);
+                        
+                        if ($existing_tag) {
+                            $tag_id = $existing_tag['id'];
+                        } else {
+                            // Create new tag
+                            $db->query("INSERT INTO tags (campus_id, name, slug) VALUES (?, ?, ?)", [current_campus_id(), $tag_name, $tag_slug]);
+                            $tag_id = $db->lastInsertId();
+                        }
+                        
+                        // Associate tag with post
+                        $db->query("INSERT IGNORE INTO post_tags (post_id, tag_id) VALUES (?, ?)", [$post_id, $tag_id]);
+                    }
+                }
+            }
+            
+            $_SESSION['flash_message'] = [
+                'type' => 'success', 
+                'message' => "Post updated successfully! " . 
+                           ($status === 'published' ? 'It is now live.' : 
+                            ($status === 'pending' ? 'It has been submitted for review.' : 'Changes have been saved.'))
+            ];
+            
+            header('Location: edit.php?id=' . $post_id);
+            exit;
+            
+        } catch (Exception $e) {
+            $errors[] = 'Error updating post: ' . $e->getMessage();
+        }
+    }
+}
+
+// Use POST data if available, otherwise use existing post data
+$form_data = $_SERVER['REQUEST_METHOD'] === 'POST' ? $_POST : $post;
+
+// Handle categories and tags for form display
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    $form_data['category_ids'] = $existing_category_ids;
+    $form_data['tags'] = implode(', ', $existing_tag_names);
+}
+
+$page_title = 'Edit Post';
+$page_description = 'Edit and update post content';
+
+include __DIR__ . '/../layouts/header-new.php';
+?>
+
+<div class="container-fluid px-4">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h1 class="mt-4"><?php echo $page_title; ?></h1>
+            <ol class="breadcrumb mb-4">
+                <li class="breadcrumb-item"><a href="../index.php">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="index.php">Posts</a></li>
+                <li class="breadcrumb-item active">Edit Post</li>
+            </ol>
+        </div>
+        <div>
+            <a href="index.php" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Posts
+            </a>
+        </div>
+    </div>
+
+    <!-- Error Messages -->
+    <?php if (!empty($errors)): ?>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <ul class="mb-0">
+                <?php foreach ($errors as $error): ?>
+                    <li><?php echo htmlspecialchars($error); ?></li>
+                <?php endforeach; ?>
+            </ul>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    <?php endif; ?>
+
+    <!-- Flash Messages -->
+    <?php if (isset($_SESSION['flash_message'])): ?>
+        <div class="alert alert-<?php echo $_SESSION['flash_message']['type']; ?> alert-dismissible fade show auto-dismiss" role="alert">
+            <div class="d-flex align-items-center">
+                <i class="me-2" data-feather="<?php echo $_SESSION['flash_message']['type'] === 'success' ? 'check-circle' : 'alert-circle'; ?>"></i>
+                <?php echo htmlspecialchars($_SESSION['flash_message']['message']); ?>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        <?php unset($_SESSION['flash_message']); ?>
+    <?php endif; ?>
+
+    <form method="POST" id="postForm" class="auto-save" enctype="multipart/form-data">
+        <div class="row">
+            <!-- Main Content -->
+            <div class="col-lg-8">
+                <!-- Title -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="title" class="form-label">Title *</label>
+                            <input type="text" name="title" id="title" class="form-control form-control-lg" 
+                                   placeholder="Enter post title..." 
+                                   value="<?php echo htmlspecialchars($form_data['title'] ?? ''); ?>" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="excerpt" class="form-label">Excerpt</label>
+                            <textarea name="excerpt" id="excerpt" class="form-control" rows="3"
+                                      placeholder="Brief description or summary..."><?php echo htmlspecialchars($form_data['excerpt'] ?? ''); ?></textarea>
+                            <div class="form-text">Leave blank to auto-generate from content.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Content Editor -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <i class="fas fa-edit me-1"></i>
+                        Content
+                    </div>
+                    <div class="card-body">
+                        <textarea name="content" id="content" class="form-control"><?php echo htmlspecialchars($form_data['content'] ?? ''); ?></textarea>
+                    </div>
+                </div>
+
+                <!-- SEO Settings -->
+                <div class="card mb-4">
+                    <div class="card-header" data-bs-toggle="collapse" data-bs-target="#seoSettings" style="cursor: pointer;">
+                        <i class="fas fa-search me-1"></i>
+                        SEO Settings
+                        <i class="fas fa-chevron-down float-end"></i>
+                    </div>
+                    <div class="collapse" id="seoSettings">
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="meta_title" class="form-label">Meta Title</label>
+                                <input type="text" name="meta_title" id="meta_title" class="form-control" 
+                                       placeholder="SEO title (leave blank to use post title)"
+                                       value="<?php echo htmlspecialchars($form_data['meta_title'] ?? ''); ?>">
+                                <div class="form-text">Recommended: 50-60 characters</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="meta_description" class="form-label">Meta Description</label>
+                                <textarea name="meta_description" id="meta_description" class="form-control" rows="3"
+                                          placeholder="SEO description (leave blank to use excerpt)"><?php echo htmlspecialchars($form_data['meta_description'] ?? ''); ?></textarea>
+                                <div class="form-text">Recommended: 150-160 characters</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="col-lg-4">
+                <!-- Post Info -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Post Information
+                    </div>
+                    <div class="card-body">
+                        <div class="small text-muted">
+                            <div class="mb-2">
+                                <strong>Created:</strong> <?php echo date('F j, Y \a\t g:i A', strtotime($post['created_at'])); ?>
+                            </div>
+                            <div class="mb-2">
+                                <strong>Last Updated:</strong> <?php echo $post['updated_at'] ? date('F j, Y \a\t g:i A', strtotime($post['updated_at'])) : 'Never'; ?>
+                            </div>
+                            <?php if ($post['published_at']): ?>
+                                <div class="mb-2">
+                                    <strong>Published:</strong> <?php echo date('F j, Y \a\t g:i A', strtotime($post['published_at'])); ?>
+                                </div>
+                            <?php endif; ?>
+                            <div class="mb-2">
+                                <strong>Slug:</strong> <code><?php echo htmlspecialchars($post['slug']); ?></code>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Publish Options -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <i class="fas fa-paper-plane me-1"></i>
+                        Publish
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="status" class="form-label">Status</label>
+                            <select name="status" id="status" class="form-select">
+                                <option value="draft" <?php echo ($form_data['status'] ?? '') === 'draft' ? 'selected' : ''; ?>>
+                                    Save as Draft
+                                </option>
+                                <?php if (is_campus_admin() || is_super_admin()): ?>
+                                    <option value="published" <?php echo ($form_data['status'] ?? '') === 'published' ? 'selected' : ''; ?>>
+                                        Published
+                                    </option>
+                                    <option value="archived" <?php echo ($form_data['status'] ?? '') === 'archived' ? 'selected' : ''; ?>>
+                                        Archived
+                                    </option>
+                                <?php else: ?>
+                                    <option value="pending" <?php echo ($form_data['status'] ?? '') === 'pending' ? 'selected' : ''; ?>>
+                                        Submit for Review
+                                    </option>
+                                <?php endif; ?>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input type="checkbox" name="is_featured" id="is_featured" class="form-check-input" 
+                                       value="1" <?php echo ($form_data['is_featured'] ?? 0) ? 'checked' : ''; ?>>
+                                <label for="is_featured" class="form-check-label">
+                                    Featured Post
+                                </label>
+                            </div>
+                            <div class="form-text">Featured posts appear prominently on the homepage.</div>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> 
+                                Update Post
+                            </button>
+                            <a href="index.php" class="btn btn-outline-secondary">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                            
+                            <?php if ($post['status'] === 'published'): ?>
+                                <a href="view-post.php?id=<?php echo $post['id']; ?>" class="btn btn-outline-info" target="_blank">
+                                    <i class="fas fa-eye"></i> Preview Post
+                                </a>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tags -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <i class="fas fa-tags me-1"></i>
+                        Tags
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <input type="text" name="tags" id="tags" class="form-control" 
+                                   placeholder="Enter tags separated by commas"
+                                   value="<?php echo htmlspecialchars($form_data['tags'] ?? ''); ?>">
+                            <div class="form-text">Example: news, events, campus life</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Categories -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <i class="fas fa-folder me-1"></i>
+                        Categories *
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <?php if (empty($category_options)): ?>
+                                <div class="alert alert-warning">
+                                    <p class="mb-2">No categories available. <a href="../categories/create.php" target="_blank">Create categories first</a>.</p>
+                                </div>
+                            <?php else: ?>
+                                <div class="category-checkboxes" style="max-height: 200px; overflow-y: auto;">
+                                    <?php foreach ($category_options as $option): ?>
+                                        <div class="form-check">
+                                            <input type="checkbox" name="category_ids[]" value="<?php echo $option['id']; ?>" 
+                                                   class="form-check-input category-checkbox"
+                                                   id="category_<?php echo $option['id']; ?>"
+                                                   <?php echo in_array($option['id'], $form_data['category_ids'] ?? []) ? 'checked' : ''; ?>>
+                                            <label for="category_<?php echo $option['id']; ?>" class="form-check-label">
+                                                <?php echo $option['name']; ?>
+                                            </label>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                                <div class="form-text">Select at least one category for this post.</div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Featured Image -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <i class="fas fa-image me-1"></i>
+                        Featured Image
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <div class="row g-2">
+                                <div class="col-8">
+                                    <input type="file" class="form-control" id="featured_image" name="featured_image" accept="image/*">
+                                </div>
+                                <div class="col-4">
+                                    <button type="button" class="btn btn-outline-primary w-100" onclick="browseFeaturedImage()">
+                                        <i class="fas fa-search me-1"></i>
+                                        Browse Library
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="form-text">Upload new image or browse existing media library</div>
+                            <input type="hidden" id="featured_image_url" name="featured_image_url" 
+                                   value="<?php echo htmlspecialchars($form_data['featured_image_url'] ?? ''); ?>">
+                        </div>
+                        <div id="imagePreview" style="<?php echo !empty($form_data['featured_image_url']) ? 'display: block;' : 'display: none;'; ?>">
+                            <img id="previewImg" src="<?php echo htmlspecialchars($form_data['featured_image_url'] ?? ''); ?>" 
+                                 alt="Preview" class="img-fluid rounded mb-2" style="max-width: 200px;">
+                            <div class="mt-2">
+                                <button type="button" class="btn btn-sm btn-outline-danger me-2" onclick="removeImage()">
+                                    <i class="fas fa-times"></i> Remove
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="editImageDetails()">
+                                    <i class="fas fa-edit"></i> Edit Details
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tags -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <i class="fas fa-tags me-1"></i>
+                        Tags
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <input type="text" name="tags" id="tags" class="form-control" 
+                                   placeholder="Enter tags separated by commas"
+                                   value="<?php echo htmlspecialchars($form_data['tags'] ?? ''); ?>">
+                            <div class="form-text">Example: news, events, campus life</div>
+                        </div>
+                        
+                        <?php if (!empty($popular_tags)): ?>
+                            <div class="popular-tags">
+                                <small class="text-muted">Popular tags:</small><br>
+                                <?php foreach ($popular_tags as $tag): ?>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary me-1 mb-1 tag-suggestion" 
+                                            data-tag="<?php echo htmlspecialchars($tag['name']); ?>">
+                                        <?php echo htmlspecialchars($tag['name']); ?>
+                                    </button>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-tools me-1"></i>
+                        Quick Actions
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <?php if ($can_edit): ?>
+                                <a href="delete.php?id=<?php echo $post['id']; ?>" class="btn btn-outline-danger btn-sm">
+                                    <i class="fas fa-trash-alt"></i> Delete Post
+                                </a>
+                            <?php endif; ?>
+                            
+                            <a href="view-posts.php" class="btn btn-outline-info btn-sm">
+                                <i class="fas fa-list"></i> View All Posts
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<style>
+/* CKEditor custom styling */
+.ck-editor__editable_inline {
+    min-height: 400px;
+}
+
+.ck.ck-editor {
+    max-width: 100%;
+}
+
+.ck-content {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.ck-content h1 {
+    font-size: 2rem;
+}
+
+.ck-content h2 {
+    font-size: 1.5rem;
+}
+
+.ck-content h3 {
+    font-size: 1.25rem;
+}
+
+.ck-content blockquote {
+    border-left: 4px solid #ccc;
+    margin-left: 0;
+    padding-left: 1rem;
+    font-style: italic;
+}
+</style>
+
+<!-- Include CKEditor 5 -->
+<script src="https://cdn.ckeditor.com/ckeditor5/39.0.1/classic/ckeditor.js"></script>
+
+<script>
+// Initialize CKEditor
+let contentEditor;
+
+ClassicEditor
+    .create(document.querySelector('#content'), {
+        toolbar: {
+            items: [
+                'heading', '|',
+                'bold', 'italic', 'underline', 'strikethrough', '|',
+                'bulletedList', 'numberedList', '|',
+                'outdent', 'indent', '|',
+                'link', 'insertImage', 'browseCampusMedia', 'insertTable', 'mediaEmbed', '|',
+                'alignment', '|',
+                'blockQuote', 'codeBlock', '|',
+                'undo', 'redo', '|',
+                'sourceEditing'
+            ]
+        },
+        language: 'en',
+        image: {
+            toolbar: [
+                'imageTextAlternative',
+                'imageStyle:inline',
+                'imageStyle:block',
+                'imageStyle:side'
+            ]
+        },
+        table: {
+            contentToolbar: [
+                'tableColumn',
+                'tableRow',
+                'mergeTableCells'
+            ]
+        },
+        licenseKey: '',
+        heading: {
+            options: [
+                { model: 'paragraph', title: 'Paragraph', class: 'ck-heading_paragraph' },
+                { model: 'heading1', view: 'h1', title: 'Heading 1', class: 'ck-heading_heading1' },
+                { model: 'heading2', view: 'h2', title: 'Heading 2', class: 'ck-heading_heading2' },
+                { model: 'heading3', view: 'h3', title: 'Heading 3', class: 'ck-heading_heading3' }
+            ]
+        }
+    })
+    .then(editor => {
+        contentEditor = editor;
+        window.editor = editor;
+        
+        // Add custom media browser button
+        editor.ui.componentFactory.add('browseCampusMedia', locale => {
+            const view = new editor.ui.buttonView(locale);
+            
+            view.set({
+                label: 'Browse Media Library',
+                icon: '<svg viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M6.972 16.615a.997.997 0 0 1-.744-.292l-4.596-4.596a1 1 0 0 1 0-1.414l4.596-4.596a1 1 0 0 1 1.414 0l4.596 4.596a1 1 0 0 1 0 1.414l-4.596 4.596a.99.99 0 0 1-.67.292z" fill="#999"/><path d="M6.972 14.615l-3.596-3.596 3.596-3.596 3.596 3.596-3.596 3.596z" fill="#444"/></svg>',
+                tooltip: true
+            });
+            
+            view.on('execute', () => {
+                openMediaBrowser();
+            });
+            
+            return view;
+        });
+        
+        // Set editor height
+        editor.editing.view.change(writer => {
+            writer.setStyle('height', '400px', editor.editing.view.document.getRoot());
+        });
+    })
+    .catch(error => {
+        console.error('CKEditor initialization failed:', error);
+    });
+
+// Media Browser Functions
+function openMediaBrowser() {
+    const browserWindow = window.open(
+        '../media/media-browser.php?type=content', 
+        'mediaBrowser', 
+        'width=1200,height=800,scrollbars=yes,resizable=yes'
+    );
+    browserWindow.focus();
+}
+
+// Browse for featured image
+function browseFeaturedImage() {
+    const browserWindow = window.open(
+        '../media/media-browser.php?type=featured&file_type=image', 
+        'featuredImageBrowser', 
+        'width=1200,height=800,scrollbars=yes,resizable=yes'
+    );
+    browserWindow.focus();
+}
+
+// Callback function for content media browser
+function insertMediaCallback(media) {
+    if (contentEditor) {
+        let content = '';
+        
+        if (media.type === 'image') {
+            content = `<figure class="image"><img src="${media.url}" alt="${media.alt || media.filename}"></figure>`;
+        } else if (media.type === 'video') {
+            content = `<video controls style="width: 100%; max-width: 640px;"><source src="${media.url}" type="video/mp4">Your browser does not support the video tag.</video>`;
+        } else if (media.type === 'audio') {
+            content = `<audio controls style="width: 100%;"><source src="${media.url}" type="audio/mpeg">Your browser does not support the audio tag.</audio>`;
+        } else {
+            content = `<a href="${media.url}" target="_blank" rel="noopener">${media.filename}</a>`;
+        }
+        
+        const viewFragment = contentEditor.data.processor.toView(content);
+        const modelFragment = contentEditor.data.toModel(viewFragment);
+        contentEditor.model.insertContent(modelFragment);
+    }
+}
+
+// Callback function for featured image browser
+function insertFeaturedImageCallback(media) {
+    document.getElementById('featured_image_url').value = media.url;
+    document.getElementById('previewImg').src = media.url;
+    document.getElementById('imagePreview').style.display = 'block';
+    
+    // Clear file input since we're using library image
+    document.getElementById('featured_image').value = '';
+}
+
+// Handle featured image upload
+document.getElementById('featured_image').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('previewImg').src = e.target.result;
+            document.getElementById('imagePreview').style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+function removeImage() {
+    document.getElementById('featured_image').value = '';
+    document.getElementById('featured_image_url').value = '';
+    document.getElementById('imagePreview').style.display = 'none';
+}
+
+function editImageDetails() {
+    // Open image editing modal (could be implemented later)
+    alert('Image editing functionality can be implemented here');
+}
+
+// Auto-generate slug from title
+document.getElementById('title').addEventListener('input', function() {
+    // Auto-save functionality can be added here
+});
+
+// Character counters
+document.addEventListener('DOMContentLoaded', function() {
+    const metaTitle = document.getElementById('meta_title');
+    const metaDescription = document.getElementById('meta_description');
+    
+    function addCharCounter(element, maxLength) {
+        const counter = document.createElement('div');
+        counter.className = 'form-text';
+        element.parentNode.appendChild(counter);
+        
+        function updateCounter() {
+            const length = element.value.length;
+            counter.textContent = `${length}/${maxLength} characters`;
+            counter.className = length > maxLength ? 'form-text text-danger' : 'form-text text-muted';
+        }
+        
+        element.addEventListener('input', updateCounter);
+        updateCounter();
+    }
+    
+    if (metaTitle) addCharCounter(metaTitle, 60);
+    if (metaDescription) addCharCounter(metaDescription, 160);
+});
+
+// Form submission handling
+document.getElementById('postForm').addEventListener('submit', function(e) {
+    // Basic validation
+    const title = document.getElementById('title').value.trim();
+    const content = contentEditor ? contentEditor.getData() : '';
+    const categoryCheckboxes = document.querySelectorAll('.category-checkbox:checked');
+    
+    if (!title) {
+        alert('Please enter a title for your post.');
+        e.preventDefault();
+        return false;
+    }
+    
+    if (!content || content.trim() === '') {
+        alert('Please enter some content for your post.');
+        e.preventDefault();
+        return false;
+    }
+    
+    if (categoryCheckboxes.length === 0) {
+        alert('Please select at least one category for your post.');
+        e.preventDefault();
+        return false;
+    }
+    
+    // Update the textarea with CKEditor content before form submission
+    if (contentEditor) {
+        document.getElementById('content').value = contentEditor.getData();
+    }
+});
+
+// Tag suggestion functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const tagInput = document.getElementById('tags');
+    const tagSuggestions = document.querySelectorAll('.tag-suggestion');
+    
+    tagSuggestions.forEach(button => {
+        button.addEventListener('click', function() {
+            const tagName = this.getAttribute('data-tag');
+            const currentTags = tagInput.value.split(',').map(tag => tag.trim()).filter(tag => tag !== '');
+            
+            if (!currentTags.includes(tagName)) {
+                currentTags.push(tagName);
+                tagInput.value = currentTags.join(', ');
+            }
+        });
+    });
+});
+
+// Auto-dismiss alerts
+document.addEventListener('DOMContentLoaded', function() {
+    const autoAlerts = document.querySelectorAll('.auto-dismiss');
+    autoAlerts.forEach(alert => {
+        setTimeout(() => {
+            const bsAlert = new bootstrap.Alert(alert);
+            bsAlert.close();
+        }, 5000);
+    });
+});
+</script>
+
+<?php include __DIR__ . '/../layouts/footer-new.php'; ?>

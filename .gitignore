@@ -1,0 +1,53 @@
+# Node modules
+node_modules
+dist
+
+# Database configuration
+config/database.php
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Cache and temporary files
+cache/
+temp/
+tmp/
+*.tmp
+*.log
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Composer vendor (if any)
+vendor/
+
+# Session files
+sessions/
+
+# Error logs
+error.log
+access.log
+
+# Test and debug files
+test_*.php
+debug_*.php
