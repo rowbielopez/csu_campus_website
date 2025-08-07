@@ -5,10 +5,17 @@ dist
 # Database configuration
 config/database.php
 
+# Email credentials
+config/email-credentials.php
+
 # Environment files
 .env
 .env.local
 .env.production
+
+# Composer
+vendor/
+composer.lock
 
 # Cache and temporary files
 cache/

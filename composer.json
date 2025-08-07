@@ -1,0 +1,12 @@
+{
+    "name": "csu/campus-website",
+    "description": "CSU Campus Website Management System",
+    "require": {
+        "phpmailer/phpmailer": "6.8"
+    },
+    "authors": [
+        {
+            "name": "CSU IT Department"
+        }
+    ]
+}

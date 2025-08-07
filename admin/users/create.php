@@ -11,6 +11,7 @@ define('ADMIN_ACCESS', true);
 require_once __DIR__ . '/../../core/middleware/admin_only.php';
 require_once __DIR__ . '/../../core/functions/auth.php';
 require_once __DIR__ . '/../../core/functions/utilities.php';
+require_once __DIR__ . '/../../core/classes/EmailService.php';
 require_once __DIR__ . '/../../config/config.php';
 
 // Get current user and campus
@@ -96,7 +97,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'message' => "User '{$username}' created successfully."
                 ];
                 
-                // TODO: Send invitation email if $send_invite is true
+                // Send invitation email if requested
+                if ($send_invite) {
+                    $emailService = new EmailService();
+                    
+                    if ($emailService->isConfigured()) {
+                        $loginUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . 
+                                   '://' . $_SERVER['HTTP_HOST'] . '/campus_website2/login.php';
+                        
+                        $emailResult = $emailService->sendUserInvitation(
+                            $email,
+                            $first_name . ' ' . $last_name,
+                            $username,
+                            $password,
+                            $loginUrl
+                        );
+                        
+                        if ($emailResult['success']) {
+                            $_SESSION['flash_message']['message'] .= ' Invitation email sent successfully.';
+                        } else {
+                            $_SESSION['flash_message']['message'] .= ' Warning: Could not send invitation email - ' . $emailResult['message'];
+                        }
+                    } else {
+                        $_SESSION['flash_message']['message'] .= ' Warning: Email service not configured - invitation email not sent.';
+                    }
+                }
                 
                 header('Location: index.php');
                 exit;

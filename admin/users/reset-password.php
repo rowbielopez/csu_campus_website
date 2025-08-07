@@ -5,6 +5,7 @@
 
 require_once __DIR__ . '/../../core/middleware/auth.php';
 require_once __DIR__ . '/../../core/classes/Database.php';
+require_once __DIR__ . '/../../core/classes/EmailService.php';
 
 // Check if user has permission to manage users
 if (!is_logged_in() || (!is_super_admin() && !is_campus_admin())) {
@@ -67,10 +68,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'message' => "Password reset successfully for user '{$user['username']}'."
             ];
             
-            // TODO: Send email notification if $send_email is true
+            // Send email notification if requested
             if ($send_email) {
-                // Email sending functionality would go here
-                $_SESSION['flash_message']['message'] .= ' Email notification sent.';
+                $emailService = new EmailService();
+                
+                if ($emailService->isConfigured()) {
+                    $emailResult = $emailService->sendPasswordReset(
+                        $user['email'],
+                        $user['first_name'] . ' ' . $user['last_name'],
+                        $new_password
+                    );
+                    
+                    if ($emailResult['success']) {
+                        $_SESSION['flash_message']['message'] .= ' Email notification sent.';
+                    } else {
+                        $_SESSION['flash_message']['message'] .= ' Warning: Could not send email notification - ' . $emailResult['message'];
+                    }
+                } else {
+                    $_SESSION['flash_message']['message'] .= ' Warning: Email service not configured - notification email not sent.';
+                }
             }
         } else {
             $_SESSION['flash_message'] = [
