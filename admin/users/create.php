@@ -83,7 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (empty($errors)) {
             $password_hash = password_hash($password, PASSWORD_DEFAULT);
             
-            $sql = "INSERT INTO users (username, email, password, first_name, last_name, role, campus_id, status, created_at) 
+            $sql = "INSERT INTO users (username, email, password_hash, first_name, last_name, role, campus_id, status, created_at) 
                     VALUES (?, ?, ?, ?, ?, ?, ?, 1, NOW())";
             
             $result = $db->query($sql, [

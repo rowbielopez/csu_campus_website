@@ -6,10 +6,45 @@
 require_once __DIR__ . '/../core/middleware/auth.php';
 require_once __DIR__ . '/../core/classes/Auth.php';
 require_once __DIR__ . '/../core/classes/Database.php';
+require_once __DIR__ . '/../core/functions/helpers.php';
+require_once __DIR__ . '/../core/functions/utilities.php';
+require_once __DIR__ . '/../core/functions/auth.php';
+require_once __DIR__ . '/../core/bootstrap.php';
+
+// Create asset_url function if it doesn't exist
+if (!function_exists('asset_url')) {
+    function asset_url($path = '') {
+        return '/campus_website2/src/assets/' . ltrim($path, '/');
+    }
+}
 
 $auth = new Auth();
 $db = Database::getInstance();
 $user = $auth->getCurrentUser();
+$current_user = get_logged_in_user(); // For template compatibility
+$page_title = 'Dashboard';
+
+// Define campus constants for template compatibility
+if (!defined('CAMPUS_NAME')) {
+    $campus_id = current_campus_id();
+    $campus_info = $auth->getCampusById($campus_id);
+    
+    if ($campus_info) {
+        define('CAMPUS_NAME', $campus_info['name'] ?? 'Campus');
+        define('CAMPUS_FULL_NAME', $campus_info['full_name'] ?? 'Campus Website');
+        define('CAMPUS_PRIMARY_COLOR', $campus_info['primary_color'] ?? '#1e3a8a');
+        define('CAMPUS_SECONDARY_COLOR', $campus_info['secondary_color'] ?? '#3b82f6');
+        define('CAMPUS_FAVICON_PATH', '/campus_website2/src/assets/img/favicon.png');
+        define('CAMPUS_ENABLE_EVENTS', true);
+    } else {
+        define('CAMPUS_NAME', 'Admin');
+        define('CAMPUS_FULL_NAME', 'CSU Campus CMS');
+        define('CAMPUS_PRIMARY_COLOR', '#1e3a8a');
+        define('CAMPUS_SECONDARY_COLOR', '#3b82f6');
+        define('CAMPUS_FAVICON_PATH', '/campus_website2/src/assets/img/favicon.png');
+        define('CAMPUS_ENABLE_EVENTS', true);
+    }
+}
 
 // Get dashboard statistics
 $stats = [];
@@ -17,9 +52,10 @@ $stats = [];
 if (is_super_admin()) {
     // Super admin sees global statistics
     $stats['campuses'] = $db->fetch("SELECT COUNT(*) as count FROM campuses WHERE status = 'active'")['count'];
-    $stats['total_users'] = $db->fetch("SELECT COUNT(*) as count FROM users WHERE status = 1")['count'];
-    $stats['total_posts'] = $db->fetch("SELECT COUNT(*) as count FROM posts")['count'];
-    $stats['total_pages'] = $db->fetch("SELECT COUNT(*) as count FROM pages")['count'];
+    $stats['users'] = $db->fetch("SELECT COUNT(*) as count FROM users WHERE status = 1")['count'];
+    $stats['posts'] = $db->fetch("SELECT COUNT(*) as count FROM posts")['count'];
+    $stats['pages'] = $db->fetch("SELECT COUNT(*) as count FROM pages")['count'];
+    $stats['media'] = $db->fetch("SELECT COUNT(*) as count FROM media WHERE 1")['count'] ?? 0;
     
     // Get campus-wise user counts
     $campus_stats = $db->fetchAll("
@@ -34,9 +70,10 @@ if (is_super_admin()) {
 } else {
     // Campus admin sees campus-specific statistics
     $campus_id = current_campus_id();
-    $stats['campus_users'] = $db->fetch("SELECT COUNT(*) as count FROM users WHERE campus_id = ? AND status = 1", [$campus_id])['count'];
-    $stats['campus_posts'] = $db->fetch("SELECT COUNT(*) as count FROM posts WHERE campus_id = ?", [$campus_id])['count'];
-    $stats['campus_pages'] = $db->fetch("SELECT COUNT(*) as count FROM pages WHERE campus_id = ?", [$campus_id])['count'];
+    $stats['users'] = $db->fetch("SELECT COUNT(*) as count FROM users WHERE campus_id = ? AND status = 1", [$campus_id])['count'];
+    $stats['posts'] = $db->fetch("SELECT COUNT(*) as count FROM posts WHERE campus_id = ?", [$campus_id])['count'];
+    $stats['pages'] = $db->fetch("SELECT COUNT(*) as count FROM pages WHERE campus_id = ?", [$campus_id])['count'];
+    $stats['media'] = $db->fetch("SELECT COUNT(*) as count FROM media WHERE campus_id = ?", [$campus_id])['count'] ?? 0;
     $stats['published_posts'] = $db->fetch("SELECT COUNT(*) as count FROM posts WHERE campus_id = ? AND status = 'published'", [$campus_id])['count'];
     
     // Get campus information
@@ -45,7 +82,7 @@ if (is_super_admin()) {
 
 // Get recent activity (last 10 posts/pages)
 if (is_super_admin()) {
-    $recent_content = $db->fetchAll("
+    $recent_activity = $db->fetchAll("
         SELECT p.title, p.created_at, p.status, u.first_name, u.last_name, c.name as campus_name, 'post' as type
         FROM posts p 
         JOIN users u ON p.author_id = u.id 
@@ -60,7 +97,7 @@ if (is_super_admin()) {
     ");
 } else {
     $campus_id = current_campus_id();
-    $recent_content = $db->fetchAll("
+    $recent_activity = $db->fetchAll("
         SELECT p.title, p.created_at, p.status, u.first_name, u.last_name, 'post' as type
         FROM posts p 
         JOIN users u ON p.author_id = u.id 
