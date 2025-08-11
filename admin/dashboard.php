@@ -303,6 +303,10 @@ if (is_super_admin()) {
                             <div class="nav-link-icon"><i data-feather="grid"></i></div>
                             Widgets
                         </a>
+                        <a class="nav-link" href="<?= admin_url('carousel.php') ?>">
+                            <div class="nav-link-icon"><i data-feather="image"></i></div>
+                            Carousel
+                        </a>
                         
                         <!-- Users -->
                         <?php if ($user->hasPermission('manage_users')): ?>

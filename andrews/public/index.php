@@ -23,53 +23,46 @@ if (empty($featured_posts)) {
 // Get recent news/updates
 $recent_posts = get_campus_posts(4);
 
-// Get sidebar widgets
-$sidebar_widgets = get_campus_widgets('sidebar');
+// Get homepage-specific widgets
+$home_main_widgets = get_campus_widgets('home_main');
+$home_sidebar_widgets = get_campus_widgets('home_sidebar');
+
+// Fallback to regular sidebar widgets if no homepage sidebar widgets
+$sidebar_widgets = !empty($home_sidebar_widgets) ? $home_sidebar_widgets : get_campus_widgets('sidebar');
 
 include 'layouts/header.php';
+
+// Get carousel items for this campus
+$carousel_items = get_carousel_items();
 ?>
 
-<!-- Hero Section -->
-<section class="hero-section">
+<!-- Modern Image Carousel -->
+<?php if (!empty($carousel_items)): ?>
+<section class="carousel-section py-5">
     <div class="container">
-        <div class="row align-items-center">
-            <div class="col-lg-8">
-                <div class="hero-content">
-                    <h1 class="display-4 fw-bold mb-4">
-                        Welcome to <?php echo htmlspecialchars($campus['name']); ?>
-                    </h1>
-                    <p class="lead mb-4">
-                        <?php echo htmlspecialchars($campus['seo_description']); ?>
-                    </p>
-                    <div class="hero-buttons">
-                        <a href="posts.php" class="btn btn-light btn-lg me-3">
-                            Latest News
-                        </a>
-                        <a href="about.php" class="btn btn-outline-light btn-lg">
-                            Learn More
-                        </a>
-                    </div>
-                </div>
-            </div>
-            <div class="col-lg-4">
-                <div class="hero-image text-center">
-                    <div class="campus-logo">
-                        <div class="rounded-circle d-inline-flex align-items-center justify-content-center bg-white text-primary" 
-                             style="width: 150px; height: 150px; font-size: 3rem; font-weight: bold;">
-                            <?php echo strtoupper(substr($campus['code'], 0, 3)); ?>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <?php echo render_carousel($carousel_items); ?>
     </div>
 </section>
+<?php endif; ?>
 
 <!-- Main Content -->
 <div class="container my-5">
     <div class="row">
         <!-- Main Content Area -->
         <div class="col-lg-8">
+            <!-- Homepage Main Widgets -->
+            <?php if (!empty($home_main_widgets)): ?>
+                <section class="mb-5">
+                    <div class="row">
+                        <?php foreach ($home_main_widgets as $widget): ?>
+                            <div class="col-12 mb-4">
+                                <?php echo render_widget($widget); ?>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </section>
+            <?php endif; ?>
+            
             <?php if (!empty($featured_posts)): ?>
                 <!-- Featured Posts Section -->
                 <section class="mb-5">
@@ -225,64 +218,20 @@ include 'layouts/header.php';
         <!-- Sidebar -->
         <div class="col-lg-4">
             <aside class="sidebar">
-                <!-- Announcements Widget -->
-                <div class="widget mb-4">
-                    <h5 class="widget-title">Quick Announcements</h5>
-                    <div class="widget-content">
-                        <div class="alert alert-info">
-                            <strong>New Semester Registration</strong><br>
-                            Registration for the upcoming semester is now open. Visit the registrar's office for more details.
-                        </div>
-                        <div class="alert alert-warning">
-                            <strong>Library Notice</strong><br>
-                            The library will be closed for maintenance on weekends this month.
-                        </div>
-                    </div>
-                </div>
-                
                 <!-- Custom Widgets from Database -->
                 <?php if (!empty($sidebar_widgets)): ?>
                     <?php foreach ($sidebar_widgets as $widget): ?>
                         <?php echo render_widget($widget); ?>
                     <?php endforeach; ?>
+                <?php else: ?>
+                    <!-- Fallback message if no widgets -->
+                    <div class="widget mb-4">
+                        <h5 class="widget-title">No Widgets Available</h5>
+                        <div class="widget-content">
+                            <p class="text-muted">Please add widgets through the admin panel.</p>
+                        </div>
+                    </div>
                 <?php endif; ?>
-                
-                <!-- Contact Information Widget -->
-                <div class="widget mb-4">
-                    <h5 class="widget-title">Contact Information</h5>
-                    <div class="widget-content">
-                        <p><strong><?php echo htmlspecialchars($campus['full_name']); ?></strong></p>
-                        <p class="mb-2">
-                            <svg width="16" height="16" fill="currentColor" class="bi bi-geo-alt me-2" viewBox="0 0 16 16">
-                                <path d="M12.166 8.94c-.524 1.062-1.234 2.12-1.96 3.07A31.493 31.493 0 0 1 8 14.58a31.481 31.481 0 0 1-2.206-2.57c-.726-.95-1.436-2.008-1.96-3.07C3.304 7.867 3 6.862 3 6a5 5 0 0 1 10 0c0 .862-.305 1.867-.834 2.94zM8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10z"/>
-                                <path d="M8 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 1a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
-                            </svg>
-                            <?php echo htmlspecialchars($campus['address']); ?>
-                        </p>
-                        <p class="mb-0">
-                            <svg width="16" height="16" fill="currentColor" class="bi bi-envelope me-2" viewBox="0 0 16 16">
-                                <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4Zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1H2Zm13 2.383-4.708 2.825L15 11.105V5.383Zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741ZM1 11.105l4.708-2.897L1 5.383v5.722Z"/>
-                            </svg>
-                            <a href="mailto:<?php echo $campus['contact_email']; ?>" class="text-decoration-none">
-                                <?php echo htmlspecialchars($campus['contact_email']); ?>
-                            </a>
-                        </p>
-                    </div>
-                </div>
-                
-                <!-- Quick Links Widget -->
-                <div class="widget mb-4">
-                    <h5 class="widget-title">Quick Links</h5>
-                    <div class="widget-content">
-                        <ul class="list-unstyled">
-                            <li class="mb-2"><a href="#" class="text-decoration-none">Student Portal</a></li>
-                            <li class="mb-2"><a href="#" class="text-decoration-none">Faculty Directory</a></li>
-                            <li class="mb-2"><a href="#" class="text-decoration-none">Academic Calendar</a></li>
-                            <li class="mb-2"><a href="#" class="text-decoration-none">Library Catalog</a></li>
-                            <li class="mb-2"><a href="../login.php" class="text-decoration-none">Admin Login</a></li>
-                        </ul>
-                    </div>
-                </div>
             </aside>
         </div>
     </div>

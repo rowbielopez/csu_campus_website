@@ -34,9 +34,6 @@ include 'layouts/header.php';
                 <h1 class="display-4 fw-bold mb-4">
                     About <?php echo htmlspecialchars($campus['name']); ?>
                 </h1>
-                <p class="lead">
-                    <?php echo htmlspecialchars($campus['seo_description']); ?>
-                </p>
             </div>
         </div>
     </div>

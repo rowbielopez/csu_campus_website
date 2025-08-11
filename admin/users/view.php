@@ -213,10 +213,17 @@ include __DIR__ . '/../layouts/header-new.php';
                 <div class="card-body text-center">
                     <!-- Avatar -->
                     <div class="avatar avatar-xl">
-                        <div class="avatar-img rounded-circle bg-primary d-flex align-items-center justify-content-center text-white fw-bold" 
-                             style="width: 120px; height: 120px; font-size: 2rem;">
-                            <?php echo strtoupper(substr($user['username'], 0, 2)); ?>
-                        </div>
+                        <?php if (!empty($user['avatar_url']) && file_exists(__DIR__ . '/../../' . $user['avatar_url'])): ?>
+                            <img class="avatar-img rounded-3" 
+                                 src="../../<?php echo htmlspecialchars($user['avatar_url']); ?>" 
+                                 alt="<?php echo htmlspecialchars($user['username']); ?>" 
+                                 style="width: 120px; height: 120px; object-fit: cover;">
+                        <?php else: ?>
+                            <div class="avatar-img rounded-3 bg-primary d-flex align-items-center justify-content-center text-white fw-bold" 
+                                 style="width: 120px; height: 120px; font-size: 2rem;">
+                                <?php echo strtoupper(substr($user['username'], 0, 2)); ?>
+                            </div>
+                        <?php endif; ?>
                     </div>
                     
                     <!-- User Info -->
@@ -443,6 +450,40 @@ include __DIR__ . '/../layouts/header-new.php';
         </div>
     </div>
 </div>
+
+<style>
+/* Custom avatar styling for rounded rectangle */
+.avatar-img {
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.avatar-img:hover {
+    border-color: rgba(0, 97, 242, 0.3);
+    transform: scale(1.02);
+}
+
+/* Ensure consistent sizing and styling */
+.avatar-img.rounded-3 {
+    border-radius: 12px !important;
+}
+
+/* Default avatar background gradient */
+.avatar-img.bg-primary {
+    background: linear-gradient(135deg, #0061f2 0%, #0056d3 100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Profile image styling */
+.avatar-img img, .avatar-img[style*="background"] {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* Large avatar specific styling */
+.avatar-xl .avatar-img.rounded-3 {
+    border-radius: 16px !important;
+}
+</style>
 
 <script>
 // Auto-dismiss alerts

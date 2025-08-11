@@ -43,6 +43,22 @@ $category_options = buildCategoryOptions($categories);
 // Get popular tags for suggestions
 $popular_tags = $db->fetchAll("SELECT name FROM tags WHERE campus_id = ? AND is_active = 1 ORDER BY usage_count DESC LIMIT 20", [current_campus_id()]);
 
+// Get available widgets for content assignment
+$available_widgets = $db->fetchAll("
+    SELECT cw.id, cw.title, cw.position, wt.name as type_name, wt.description as type_description
+    FROM campus_widgets cw 
+    LEFT JOIN widget_types wt ON cw.widget_type_id = wt.id 
+    WHERE cw.campus_id = ? AND cw.is_active = 1 
+    ORDER BY cw.position, cw.sort_order, cw.title
+", [current_campus_id()]);
+
+// Group widgets by position for better organization
+$widgets_by_position = [];
+foreach ($available_widgets as $widget) {
+    $position = $widget['position'] ?: 'other';
+    $widgets_by_position[$position][] = $widget;
+}
+
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $title = trim($_POST['title'] ?? '');
@@ -52,6 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $featured = isset($_POST['is_featured']) ? 1 : 0;
     $category_ids = $_POST['category_ids'] ?? [];
     $tag_names = array_filter(array_map('trim', explode(',', $_POST['tags'] ?? '')));
+    $widget_ids = $_POST['widget_ids'] ?? [];
     $meta_title = trim($_POST['meta_title'] ?? '');
     $meta_description = trim($_POST['meta_description'] ?? '');
     $featured_image_url = trim($_POST['featured_image_url'] ?? '');
@@ -179,6 +196,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
             
+            // Handle widget assignments
+            if (!empty($widget_ids)) {
+                $widget_stmt = $conn->prepare("INSERT INTO post_widgets (post_id, widget_id) VALUES (?, ?)");
+                foreach ($widget_ids as $widget_id) {
+                    $widget_stmt->execute([$post_id, $widget_id]);
+                }
+            }
+            
             $_SESSION['flash_message'] = [
                 'type' => 'success', 
                 'message' => "Post created successfully! " . 
@@ -219,7 +244,7 @@ include __DIR__ . '/../layouts/header-new.php';
         </div>
         <div>
             <a href="index.php" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left"></i> Back to Posts
+                <i class="fas fa-arrow-left"></i> &nbsp; Back to Posts
             </a>
         </div>
     </div>
@@ -340,18 +365,89 @@ include __DIR__ . '/../layouts/header-new.php';
                             <button type="submit" class="btn btn-primary">
                                 <i class="fas fa-save"></i> 
                                 <?php if (is_campus_admin() || is_super_admin()): ?>
-                                    Create Post
+                                   &nbsp; Create Post
                                 <?php else: ?>
                                     Save Post
                                 <?php endif; ?>
                             </button>
                             <a href="index.php" class="btn btn-outline-secondary">
-                                <i class="fas fa-times"></i> Cancel
+                                <i class="fas fa-times"></i>  &nbsp; Cancel
                             </a>
                         </div>
                     </div>
                 </div>
 
+                <!-- Widget Assignment -->
+                <?php if (!empty($available_widgets)): ?>
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <i class="fas fa-puzzle-piece me-1"></i>
+                        Widget Assignment
+                        <small class="text-muted">(Select specific widgets for this post)</small>
+                    </div>
+                    <div class="card-body">
+                        <p class="small text-muted mb-3">
+                            <strong>Instance-Based Filtering:</strong> Select the specific widget instances where this post should appear. 
+                            Each widget can have unique content - two "Text Widgets" can show different posts.
+                        </p>
+                        
+                        <?php foreach ($widgets_by_position as $position => $widgets): ?>
+                            <div class="mb-4">
+                                <h6 class="text-primary border-bottom pb-2">
+                                    <i class="fas fa-map-marker-alt me-1"></i>
+                                    <?php echo ucfirst($position); ?> Widgets
+                                </h6>
+                                <div class="row">
+                                    <?php foreach ($widgets as $widget): ?>
+                                        <div class="col-md-6 mb-3">
+                                            <div class="form-check widget-option">
+                                                <input type="checkbox" name="widget_ids[]" value="<?php echo $widget['id']; ?>" 
+                                                       id="widget_<?php echo $widget['id']; ?>" class="form-check-input"
+                                                       <?php echo in_array($widget['id'], $_POST['widget_ids'] ?? []) ? 'checked' : ''; ?>>
+                                                <label for="widget_<?php echo $widget['id']; ?>" class="form-check-label">
+                                                    <strong><?php echo htmlspecialchars($widget['title']); ?></strong>
+                                                    <span class="badge bg-secondary ms-1"><?php echo htmlspecialchars($widget['type_name']); ?></span>
+                                                    <?php if ($widget['type_description']): ?>
+                                                        <small class="text-muted d-block">
+                                                            <?php echo htmlspecialchars($widget['type_description']); ?>
+                                                        </small>
+                                                    <?php endif; ?>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                        
+                        <div class="alert alert-info mt-3">
+                            <small>
+                                <i class="fas fa-info-circle me-1"></i>
+                                <strong>How it works:</strong> 
+                                <ul class="mb-1 mt-2">
+                                    <li>Each widget instance can show unique content</li>
+                                    <li>Two "Text Widgets" can display completely different posts</li>
+                                    <li>Select specific widgets where you want this post to appear</li>
+                                    <li>Unselected widgets will not show this post</li>
+                                </ul>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                <?php else: ?>
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <i class="fas fa-puzzle-piece me-1"></i>
+                        Widget Assignment
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-1"></i>
+                            No widgets available for assignment.
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
                 <!-- Categories -->
                 <div class="card mb-4">
                     <div class="card-header">
@@ -503,6 +599,42 @@ include __DIR__ . '/../layouts/header-new.php';
     margin-left: 0;
     padding-left: 1rem;
     font-style: italic;
+}
+
+/* Widget Type Selection Styling */
+.widget-type-option {
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 12px;
+    transition: all 0.2s ease;
+    background-color: #f9fafb;
+}
+
+.widget-type-option:hover {
+    border-color: #3b82f6;
+    background-color: #eff6ff;
+}
+
+.widget-type-option:has(input:checked) {
+    border-color: #3b82f6;
+    background-color: #dbeafe;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.widget-type-option .form-check-input:checked {
+    background-color: #3b82f6;
+    border-color: #3b82f6;
+}
+
+.widget-type-option label {
+    cursor: pointer;
+    margin-bottom: 0;
+    font-weight: 500;
+}
+
+.widget-type-option small {
+    color: #6b7280 !important;
+    font-size: 0.875rem;
 }
 </style>
 

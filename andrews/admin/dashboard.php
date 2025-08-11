@@ -199,6 +199,9 @@ try {
                             <a class="nav-link" href="media.php">
                                 <i class="fas fa-images me-2"></i> Media
                             </a>
+                            <a class="nav-link" href="../../admin/carousel.php">
+                                <i class="fas fa-images me-2"></i> Carousel
+                            </a>
                         <?php endif; ?>
 
                         <?php if (can_manage_users()): ?>

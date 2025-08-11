@@ -41,12 +41,12 @@ define('MAX_PAGE_SIZE', 100);
 define('CACHE_ENABLED', true);
 define('CACHE_LIFETIME', 3600); // 1 hour
 
-// Email Settings
-define('SMTP_HOST', 'smtp.gmail.com');
-define('SMTP_PORT', 587);
-define('SMTP_ENCRYPTION', 'tls');
-define('FROM_EMAIL', CAMPUS_EMAIL);
-define('FROM_NAME', CAMPUS_FULL_NAME);
+// Email Settings (only define if not already defined by email.php)
+if (!defined('SMTP_HOST')) define('SMTP_HOST', 'smtp.gmail.com');
+if (!defined('SMTP_PORT')) define('SMTP_PORT', 587);
+if (!defined('SMTP_ENCRYPTION')) define('SMTP_ENCRYPTION', 'tls');
+if (!defined('FROM_EMAIL')) define('FROM_EMAIL', CAMPUS_EMAIL);
+if (!defined('FROM_NAME')) define('FROM_NAME', CAMPUS_FULL_NAME);
 
 // User Roles (Updated to match ENUM values)
 define('ROLE_SUPER_ADMIN', 'super_admin');
@@ -87,6 +87,7 @@ define('LOG_LEVEL', 'INFO'); // DEBUG, INFO, WARNING, ERROR
 // Debug Settings
 define('DEBUG_MODE', false);
 define('SHOW_ERRORS', DEBUG_MODE);
+define('WIDGET_DEBUG', DEBUG_MODE); // Widget debugging mode
 
 // Campus IDs Mapping
 $CAMPUS_MAPPING = [

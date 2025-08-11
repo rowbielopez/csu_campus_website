@@ -31,7 +31,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
 if ($auth->isLoggedIn()) {
     // Check if user can access this campus
     if ($auth->canAccessCampus(CAMPUS_ID)) {
-        header('Location: admin/dashboard_fixed.php');
+        header('Location: ../admin/index.php');
     } else {
         $auth->logout();
         $error_message = 'Access denied. You do not have permission to access this campus.';
@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $result = $auth->login($email, $password, CAMPUS_ID);
         
         if ($result['success']) {
-            header('Location: admin/dashboard_fixed.php');
+            header('Location: ../admin/index.php');
             exit;
         } else {
             $error_message = $result['message'];

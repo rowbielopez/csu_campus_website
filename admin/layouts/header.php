@@ -3,6 +3,10 @@ if (!defined('ADMIN_LAYOUT')) {
     define('ADMIN_LAYOUT', true);
 }
 
+// Include required authentication functions
+require_once __DIR__ . '/../../core/bootstrap.php';
+require_once __DIR__ . '/../../core/functions/auth.php';
+
 $current_user = get_logged_in_user();
 $current_campus = get_current_campus();
 $page_title = $page_title ?? 'Admin Dashboard';
@@ -35,7 +39,12 @@ $page_title = $page_title ?? 'Admin Dashboard';
         }
         
         .navbar-brand {
-            color: var(--campus-primary) !important;
+            color: white !important;
+        }
+        
+        /* Admin navbar styling */
+        .navbar-dark {
+            background-color: var(--campus-primary) !important;
         }
         
         .btn-primary {
@@ -71,7 +80,7 @@ $page_title = $page_title ?? 'Admin Dashboard';
         
         <!-- Navbar Brand-->
         <a class="navbar-brand pe-3 ps-4 ps-lg-2" href="index.php">
-            <i class="fas fa-university me-2"></i>
+            <img src="../public/img/Cagayan State University - Logo.png" alt="CSU Logo" height="28" class="d-inline-block align-text-top me-2">
             <?php echo htmlspecialchars($current_campus['name'] ?? 'CSU CMS'); ?>
         </a>
         
@@ -232,6 +241,39 @@ $page_title = $page_title ?? 'Admin Dashboard';
                                 <a class="nav-link" href="media/upload.php">Upload Media</a>
                             </nav>
                         </div>
+                        
+                        <!-- Widget Management -->
+                        <a class="nav-link collapsed" href="javascript:void(0);" data-bs-toggle="collapse" data-bs-target="#collapseWidgetManagement" aria-expanded="false" aria-controls="collapseWidgetManagement">
+                            <div class="nav-link-icon"><i data-feather="grid"></i></div>
+                            Widgets & Menus
+                            <div class="sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                        </a>
+                        <div class="collapse" id="collapseWidgetManagement" data-bs-parent="#accordionSidenav">
+                            <nav class="sidenav-menu-nested nav">
+                                <a class="nav-link" href="widgets.php">
+                                    <div class="nav-link-icon"><i class="fas fa-puzzle-piece"></i></div>
+                                    Widget Manager
+                                </a>
+                                <a class="nav-link" href="carousel.php">
+                                    <div class="nav-link-icon"><i class="fas fa-images"></i></div>
+                                    Carousel Manager
+                                </a>
+                                <a class="nav-link" href="menus.php">
+                                    <div class="nav-link-icon"><i class="fas fa-bars"></i></div>
+                                    Menu Builder
+                                </a>
+                                <a class="nav-link" href="widget-demo-new.php">
+                                    <div class="nav-link-icon"><i class="fas fa-eye"></i></div>
+                                    Live Demo
+                                </a>
+                            </nav>
+                        </div>
+                        
+                        <!-- Carousel Management -->
+                        <a class="nav-link" href="carousel.php">
+                            <div class="nav-link-icon"><i data-feather="image"></i></div>
+                            Carousel Management
+                        </a>
                         
                         <?php if (is_campus_admin() || is_super_admin()): ?>
                             <!-- Administration -->

@@ -372,14 +372,6 @@ include __DIR__ . '/../layouts/header-new.php';
                                     <button class="btn btn-datatable btn-icon btn-transparent-dark me-2" onclick="window.open('view-post.php?id=<?php echo $post['id']; ?>', '_blank')" title="View Post">
                                         <i data-feather="eye"></i>
                                     </button>
-                                    
-                                    <?php if ((is_campus_admin() || is_super_admin()) || $post['author_id'] == $current_user['id']): ?>
-                                        <button class="btn btn-datatable btn-icon btn-transparent-dark btn-delete" 
-                                               onclick="confirmDelete(<?php echo $post['id']; ?>)" 
-                                               title="Delete">
-                                            <i data-feather="trash-2"></i>
-                                        </button>
-                                    <?php endif; ?>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -563,12 +555,6 @@ function confirmBulkAction() {
     return confirm(`Are you sure you want to ${actionText} ${checkedBoxes.length} post(s)?`);
 }
 <?php endif; ?>
-
-function confirmDelete(postId) {
-    if (confirm('Are you sure you want to delete this post? This action cannot be undone.')) {
-        window.location.href = 'delete.php?id=' + postId;
-    }
-}
 </script>
 
 <?php include __DIR__ . '/../layouts/footer-new.php'; ?>

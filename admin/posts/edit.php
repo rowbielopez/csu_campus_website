@@ -89,6 +89,35 @@ $existing_tags = $db->fetchAll("
     ORDER BY t.name", [$post_id]);
 $existing_tag_names = array_column($existing_tags, 'name');
 
+// Get available widgets for content assignment
+$available_widgets = $db->fetchAll("
+    SELECT cw.id, cw.title, cw.position, wt.name as type_name, wt.description as type_description
+    FROM campus_widgets cw 
+    LEFT JOIN widget_types wt ON cw.widget_type_id = wt.id 
+    WHERE cw.campus_id = ? AND cw.is_active = 1 
+    ORDER BY cw.position, cw.sort_order, cw.title
+", [current_campus_id()]);
+
+// Group widgets by position for better organization
+$widgets_by_position = [];
+foreach ($available_widgets as $widget) {
+    $position = $widget['position'] ?: 'other';
+    $widgets_by_position[$position][] = $widget;
+}
+
+// Get existing widget assignments for this post
+$existing_widget_assignments = [];
+try {
+    $existing_widget_assignments = $db->fetchAll("SELECT widget_id FROM post_widgets WHERE post_id = ?", [$post_id]);
+} catch (Exception $e) {
+    // Table might not exist yet, ignore for now
+}
+$existing_widget_ids = array_column($existing_widget_assignments, 'widget_id');
+
+// Get existing widget assignments for this post (legacy)
+$existing_widget_assignments = $db->fetchAll("SELECT widget_id FROM post_widgets WHERE post_id = ? AND is_active = 1", [$post_id]);
+$existing_widget_ids = array_column($existing_widget_assignments, 'widget_id');
+
 // Check edit permissions
 $can_edit = false;
 
@@ -127,6 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $featured = isset($_POST['is_featured']) ? 1 : 0;
     $category_ids = $_POST['category_ids'] ?? [];
     $tag_names = array_filter(array_map('trim', explode(',', $_POST['tags'] ?? '')));
+    $widget_ids = $_POST['widget_ids'] ?? [];
     $meta_title = trim($_POST['meta_title'] ?? '');
     $meta_description = trim($_POST['meta_description'] ?? '');
     $featured_image_url = trim($_POST['featured_image_url'] ?? '');
@@ -258,6 +288,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
             
+            // Handle widget assignments - remove existing and add new ones
+            $db->query("DELETE FROM post_widgets WHERE post_id = ?", [$post_id]);
+            
+            if (!empty($widget_ids)) {
+                foreach ($widget_ids as $widget_id) {
+                    $widget_id = intval($widget_id);
+                    if ($widget_id > 0) {
+                        // Verify widget exists
+                        $widget_check = $db->fetch("SELECT id FROM campus_widgets WHERE id = ? AND is_active = 1", [$widget_id]);
+                        if ($widget_check) {
+                            $db->query("INSERT INTO post_widgets (post_id, widget_id) VALUES (?, ?)", [$post_id, $widget_id]);
+                        }
+                    }
+                }
+            }
+            
             $_SESSION['flash_message'] = [
                 'type' => 'success', 
                 'message' => "Post updated successfully! " . 
@@ -281,6 +327,7 @@ $form_data = $_SERVER['REQUEST_METHOD'] === 'POST' ? $_POST : $post;
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     $form_data['category_ids'] = $existing_category_ids;
     $form_data['tags'] = implode(', ', $existing_tag_names);
+    $form_data['widget_ids'] = $existing_widget_ids;
 }
 
 $page_title = 'Edit Post';
@@ -463,15 +510,15 @@ include __DIR__ . '/../layouts/header-new.php';
                         <div class="d-grid gap-2">
                             <button type="submit" class="btn btn-primary">
                                 <i class="fas fa-save"></i> 
-                                Update Post
+                                 &nbsp; Update Post
                             </button>
                             <a href="index.php" class="btn btn-outline-secondary">
-                                <i class="fas fa-times"></i> Cancel
+                                <i class="fas fa-times"></i> &nbsp; Cancel
                             </a>
                             
                             <?php if ($post['status'] === 'published'): ?>
                                 <a href="view-post.php?id=<?php echo $post['id']; ?>" class="btn btn-outline-info" target="_blank">
-                                    <i class="fas fa-eye"></i> Preview Post
+                                    <i class="fas fa-eye"></i> &nbsp; Preview Post
                                 </a>
                             <?php endif; ?>
                         </div>
@@ -494,6 +541,77 @@ include __DIR__ . '/../layouts/header-new.php';
                     </div>
                 </div>
 
+                <!-- Widget Assignment -->
+                <?php if (!empty($available_widgets)): ?>
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <i class="fas fa-puzzle-piece me-1"></i>
+                        Widget Assignment
+                        <small class="text-muted">(Select specific widgets for this post)</small>
+                    </div>
+                    <div class="card-body">
+                        <p class="small text-muted mb-3">
+                            <strong>Instance-Based Filtering:</strong> Select the specific widget instances where this post should appear. 
+                            Each widget can have unique content - two "Text Widgets" can show different posts.
+                        </p>
+                        
+                        <?php foreach ($widgets_by_position as $position => $widgets): ?>
+                            <div class="mb-4">
+                                <h6 class="text-primary border-bottom pb-2">
+                                    <i class="fas fa-map-marker-alt me-1"></i>
+                                    <?php echo ucfirst($position); ?> Widgets
+                                </h6>
+                                <div class="row">
+                                    <?php foreach ($widgets as $widget): ?>
+                                        <div class="col-md-6 mb-3">
+                                            <div class="form-check widget-option">
+                                                <input type="checkbox" name="widget_ids[]" value="<?php echo $widget['id']; ?>" 
+                                                       id="widget_<?php echo $widget['id']; ?>" class="form-check-input"
+                                                       <?php echo in_array($widget['id'], $form_data['widget_ids'] ?? []) ? 'checked' : ''; ?>>
+                                                <label for="widget_<?php echo $widget['id']; ?>" class="form-check-label">
+                                                    <strong><?php echo htmlspecialchars($widget['title']); ?></strong>
+                                                    <span class="badge bg-secondary ms-1"><?php echo htmlspecialchars($widget['type_name']); ?></span>
+                                                    <?php if ($widget['type_description']): ?>
+                                                        <small class="text-muted d-block">
+                                                            <?php echo htmlspecialchars($widget['type_description']); ?>
+                                                        </small>
+                                                    <?php endif; ?>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                        
+                        <div class="alert alert-info mt-3">
+                            <small>
+                                <i class="fas fa-info-circle me-1"></i>
+                                <strong>How it works:</strong> 
+                                <ul class="mb-1 mt-2">
+                                    <li>Each widget instance can show unique content</li>
+                                    <li>Two "Text Widgets" can display completely different posts</li>
+                                    <li>Select specific widgets where you want this post to appear</li>
+                                    <li>Unselected widgets will not show this post</li>
+                                </ul>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                <?php else: ?>
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <i class="fas fa-puzzle-piece me-1"></i>
+                        Widget Assignment
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-1"></i>
+                            No widgets available for assignment.
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
                 <!-- Categories -->
                 <div class="card mb-4">
                     <div class="card-header">
@@ -554,10 +672,10 @@ include __DIR__ . '/../layouts/header-new.php';
                                  alt="Preview" class="img-fluid rounded mb-2" style="max-width: 200px;">
                             <div class="mt-2">
                                 <button type="button" class="btn btn-sm btn-outline-danger me-2" onclick="removeImage()">
-                                    <i class="fas fa-times"></i> Remove
+                                    <i class="fas fa-times"></i>&nbsp; Remove
                                 </button>
                                 <button type="button" class="btn btn-sm btn-outline-secondary" onclick="editImageDetails()">
-                                    <i class="fas fa-edit"></i> Edit Details
+                                    <i class="fas fa-edit"></i>&nbsp; Edit Details
                                 </button>
                             </div>
                         </div>
@@ -602,12 +720,12 @@ include __DIR__ . '/../layouts/header-new.php';
                         <div class="d-grid gap-2">
                             <?php if ($can_edit): ?>
                                 <a href="delete.php?id=<?php echo $post['id']; ?>" class="btn btn-outline-danger btn-sm">
-                                    <i class="fas fa-trash-alt"></i> Delete Post
+                                    <i class="fas fa-trash-alt"></i>&nbsp; Delete Post
                                 </a>
                             <?php endif; ?>
                             
                             <a href="view-posts.php" class="btn btn-outline-info btn-sm">
-                                <i class="fas fa-list"></i> View All Posts
+                                <i class="fas fa-list"></i>&nbsp; View All Posts
                             </a>
                         </div>
                     </div>
@@ -650,6 +768,42 @@ include __DIR__ . '/../layouts/header-new.php';
     margin-left: 0;
     padding-left: 1rem;
     font-style: italic;
+}
+
+/* Widget Type Selection Styling */
+.widget-type-option {
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 12px;
+    transition: all 0.2s ease;
+    background-color: #f9fafb;
+}
+
+.widget-type-option:hover {
+    border-color: #3b82f6;
+    background-color: #eff6ff;
+}
+
+.widget-type-option:has(input:checked) {
+    border-color: #3b82f6;
+    background-color: #dbeafe;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.widget-type-option .form-check-input:checked {
+    background-color: #3b82f6;
+    border-color: #3b82f6;
+}
+
+.widget-type-option label {
+    cursor: pointer;
+    margin-bottom: 0;
+    font-weight: 500;
+}
+
+.widget-type-option small {
+    color: #6b7280 !important;
+    font-size: 0.875rem;
 }
 </style>
 

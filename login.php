@@ -151,29 +151,6 @@ $csrf_token = $auth->getCsrfToken();
             border-radius: 10px;
             border: none;
         }
-        .campus-selector {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 1rem;
-            margin-bottom: 1rem;
-        }
-        .campus-link {
-            display: inline-block;
-            padding: 0.25rem 0.75rem;
-            margin: 0.25rem;
-            background: white;
-            border: 1px solid #dee2e6;
-            border-radius: 15px;
-            text-decoration: none;
-            color: #495057;
-            font-size: 0.875rem;
-            transition: all 0.2s;
-        }
-        .campus-link:hover {
-            background: #1e3a8a;
-            color: white;
-            text-decoration: none;
-        }
     </style>
 </head>
 <body>
@@ -200,24 +177,6 @@ $csrf_token = $auth->getCsrfToken();
                             <?php echo htmlspecialchars($success_message); ?>
                         </div>
                     <?php endif; ?>
-
-                    <div class="campus-selector">
-                        <h6 class="mb-2 text-muted">
-                            <i class="fas fa-map-marker-alt me-1"></i>
-                            Campus Quick Access
-                        </h6>
-                        <div class="text-center">
-                            <a href="?campus=andrews" class="campus-link">Andrews</a>
-                            <a href="?campus=aparri" class="campus-link">Aparri</a>
-                            <a href="?campus=carig" class="campus-link">Carig</a>
-                            <a href="?campus=gonzaga" class="campus-link">Gonzaga</a>
-                            <a href="?campus=lallo" class="campus-link">Lallo</a>
-                            <a href="?campus=lasam" class="campus-link">Lasam</a>
-                            <a href="?campus=piat" class="campus-link">Piat</a>
-                            <a href="?campus=sanchezmira" class="campus-link">Sanchez Mira</a>
-                            <a href="?campus=solana" class="campus-link">Solana</a>
-                        </div>
-                    </div>
 
                     <form method="POST" action="">
                         <input type="hidden" name="csrf_token" value="<?php echo $csrf_token; ?>">
@@ -259,12 +218,13 @@ $csrf_token = $auth->getCsrfToken();
                         </div>
                     </form>
 
-                    <div class="text-center mt-4">
-                        <small class="text-muted">
-                            <strong>Test Credentials:</strong><br>
-                            Super Admin: superadmin@csu.edu.ph / admin123<br>
-                            Campus Admin: andrews-admin@csu.edu.ph / admin123
-                        </small>
+                    <div class="text-center mt-3">
+                        <a href="forgot-password.php" class="text-decoration-none">
+                            <small class="text-muted">
+                                <i class="fas fa-key me-1"></i>
+                                Forgot your password?
+                            </small>
+                        </a>
                     </div>
                 </div>
             </div>

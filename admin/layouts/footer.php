@@ -34,6 +34,20 @@
     <!-- Litepicker -->
     <script src="https://cdn.jsdelivr.net/npm/litepicker/dist/bundle.js" crossorigin="anonymous"></script>
     
+    <!-- Toast Container -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div id="liveToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <i class="fas fa-info-circle me-2 toast-icon"></i>
+                <strong class="me-auto toast-title">Notification</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body toast-message">
+                Default toast message
+            </div>
+        </div>
+    </div>
+    
     <!-- Initialize Feather Icons -->
     <script>
         feather.replace();
@@ -41,6 +55,49 @@
     
     <!-- Custom Admin Scripts -->
     <script>
+        // Toast Notification System
+        function showToast(message, type = 'info', duration = 5000) {
+            const toast = document.getElementById('liveToast');
+            const toastIcon = toast.querySelector('.toast-icon');
+            const toastTitle = toast.querySelector('.toast-title');
+            const toastMessage = toast.querySelector('.toast-message');
+            const toastHeader = toast.querySelector('.toast-header');
+            
+            // Configure toast based on type
+            switch(type) {
+                case 'success':
+                    toastIcon.className = 'fas fa-check-circle me-2 toast-icon text-success';
+                    toastTitle.textContent = 'Success';
+                    toastHeader.className = 'toast-header bg-success-subtle border-success';
+                    break;
+                case 'error':
+                case 'danger':
+                    toastIcon.className = 'fas fa-exclamation-circle me-2 toast-icon text-danger';
+                    toastTitle.textContent = 'Error';
+                    toastHeader.className = 'toast-header bg-danger-subtle border-danger';
+                    break;
+                case 'warning':
+                    toastIcon.className = 'fas fa-exclamation-triangle me-2 toast-icon text-warning';
+                    toastTitle.textContent = 'Warning';
+                    toastHeader.className = 'toast-header bg-warning-subtle border-warning';
+                    break;
+                case 'info':
+                default:
+                    toastIcon.className = 'fas fa-info-circle me-2 toast-icon text-info';
+                    toastTitle.textContent = 'Info';
+                    toastHeader.className = 'toast-header bg-info-subtle border-info';
+                    break;
+            }
+            
+            toastMessage.textContent = message;
+            
+            // Create and show toast
+            const bsToast = new bootstrap.Toast(toast, {
+                delay: duration
+            });
+            bsToast.show();
+        }
+        
         // Initialize DataTables
         window.addEventListener('DOMContentLoaded', event => {
             const datatablesSimple = document.getElementById('datatablesSimple');

@@ -112,9 +112,10 @@ include 'layouts/header.php';
                 <?php if (isset($post['featured_image_url']) && $post['featured_image_url']): ?>
                     <div class="mb-4">
                         <img src="<?php echo htmlspecialchars($post['featured_image_url']); ?>" 
-                             class="img-fluid rounded shadow-sm" 
+                             class="img-fluid rounded shadow-sm cursor-pointer" 
                              alt="<?php echo htmlspecialchars($post['title']); ?>"
-                             style="width: 100%; max-height: 400px; object-fit: cover;">
+                             style="width: 100%; max-height: 400px; object-fit: cover; cursor: pointer;"
+                             onclick="openImageModal(this.src, this.alt)">
                     </div>
                 <?php endif; ?>
                 
@@ -272,6 +273,20 @@ include 'layouts/header.php';
     </div>
 </div>
 
+<!-- Image Modal -->
+<div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content bg-transparent border-0">
+            <div class="modal-header border-0 p-2">
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0 text-center">
+                <img id="modalImage" src="" alt="" class="img-fluid rounded">
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Additional CSS for post content -->
 <style>
 .post-content {
@@ -295,6 +310,13 @@ include 'layouts/header.php';
     height: auto;
     border-radius: 0.375rem;
     margin: 1rem 0;
+    cursor: pointer;
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.post-content img:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
 }
 
 .post-content blockquote {
@@ -316,6 +338,80 @@ include 'layouts/header.php';
 .post-content p {
     margin-bottom: 1.2rem;
 }
+
+/* Image Modal Styles */
+#imageModal .modal-dialog {
+    max-width: 95vw;
+    margin: 1rem;
+}
+
+#imageModal .modal-content {
+    background: rgba(0, 0, 0, 0.9);
+}
+
+#imageModal img {
+    max-height: 90vh;
+    width: auto;
+    max-width: 100%;
+    object-fit: contain;
+}
+
+/* Responsive image gallery */
+.post-content figure {
+    margin: 2rem 0;
+    text-align: center;
+}
+
+.post-content figure img {
+    margin: 0;
+}
+
+.post-content figcaption {
+    color: #6c757d;
+    font-style: italic;
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+}
+
+/* Cursor pointer for clickable images */
+.cursor-pointer {
+    cursor: pointer;
+}
+
+@media (max-width: 768px) {
+    .post-content {
+        font-size: 1rem;
+    }
+    
+    #imageModal .modal-dialog {
+        margin: 0.5rem;
+    }
+}
 </style>
+
+<script>
+// Image modal functionality
+function openImageModal(src, alt) {
+    const modal = new bootstrap.Modal(document.getElementById('imageModal'));
+    const modalImage = document.getElementById('modalImage');
+    modalImage.src = src;
+    modalImage.alt = alt;
+    modal.show();
+}
+
+// Make all images in post content clickable
+document.addEventListener('DOMContentLoaded', function() {
+    const postContent = document.querySelector('.post-content');
+    if (postContent) {
+        const images = postContent.querySelectorAll('img');
+        images.forEach(function(img) {
+            img.style.cursor = 'pointer';
+            img.addEventListener('click', function() {
+                openImageModal(this.src, this.alt);
+            });
+        });
+    }
+});
+</script>
 
 <?php include 'layouts/footer.php'; ?>

@@ -8,8 +8,8 @@ use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\SMTP;
 use PHPMailer\PHPMailer\Exception;
 
-require_once __DIR__ . '/../vendor/autoload.php';
-require_once __DIR__ . '/../config/email.php';
+require_once __DIR__ . '/../../vendor/autoload.php';
+require_once __DIR__ . '/../../config/email.php';
 
 class EmailService {
     private $mailer;
@@ -127,6 +127,41 @@ class EmailService {
             $this->mailer->send();
             
             return ['success' => true, 'message' => 'Password reset email sent successfully'];
+            
+        } catch (Exception $e) {
+            error_log("Email sending error: " . $e->getMessage());
+            return ['success' => false, 'message' => 'Failed to send email: ' . $e->getMessage()];
+        }
+    }
+    
+    /**
+     * Send password change notification
+     */
+    public function sendPasswordChangeNotification($userEmail, $userFullName) {
+        if (!$this->isConfigured) {
+            return ['success' => false, 'message' => 'Email service not configured'];
+        }
+        
+        try {
+            $this->mailer->clearAddresses();
+            $this->mailer->addAddress($userEmail, $userFullName);
+            
+            $this->mailer->Subject = 'Password Changed - CSU Campus Website';
+            
+            // Load email template
+            $emailBody = $this->loadTemplate('password-change-notification', [
+                'user_name' => $userFullName,
+                'change_time' => date('F j, Y \a\t g:i A'),
+                'login_url' => $this->getLoginUrl(),
+                'support_email' => SMTP_FROM_EMAIL
+            ]);
+            
+            $this->mailer->Body = $emailBody;
+            $this->mailer->AltBody = strip_tags(str_replace(['<br>', '<br/>', '<br />'], "\n", $emailBody));
+            
+            $this->mailer->send();
+            
+            return ['success' => true, 'message' => 'Password change notification sent successfully'];
             
         } catch (Exception $e) {
             error_log("Email sending error: " . $e->getMessage());

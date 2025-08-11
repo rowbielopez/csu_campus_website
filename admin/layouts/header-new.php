@@ -39,6 +39,9 @@ $page_description = $page_description ?? 'CSU CMS Admin Panel';
         <link href="<?php echo admin_asset_path($css_file); ?>" rel="stylesheet" />
     <?php endforeach; ?>
     
+    <!-- Cropper.js CSS for image cropping -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet" />
+    
     <!-- Favicon -->
     <link rel="icon" type="image/x-icon" href="<?php echo admin_asset_url(ADMIN_IMG_PATH . '/favicon.png'); ?>" />
     
@@ -55,11 +58,36 @@ $page_description = $page_description ?? 'CSU CMS Admin Panel';
         }
         
         .navbar-brand {
-            color: var(--campus-primary) !important;
+            color: white !important;
+        }
+        
+        /* Admin navbar styling */
+        .navbar-dark {
+            background-color: var(--campus-primary) !important;
         }
         
         .btn-primary {
             background-color: var(--campus-primary);
+            border-color: var(--campus-primary);
+        }
+        
+        /* Custom avatar styling for navigation */
+        .dropdown-user-img, .btn-transparent-dark .img-fluid, .btn-transparent-dark > div {
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .dropdown-user-img:hover, .btn-transparent-dark:hover .img-fluid, .btn-transparent-dark:hover > div {
+            transform: scale(1.05);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+        
+        /* Default avatar background */
+        .bg-primary {
+            background: linear-gradient(135deg, #0061f2 0%, #0056d3 100%) !important;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+    </style>
             border-color: var(--campus-primary);
         }
         
@@ -96,7 +124,7 @@ $page_description = $page_description ?? 'CSU CMS Admin Panel';
         
         <!-- Navbar Brand-->
         <a class="navbar-brand pe-3 ps-4 ps-lg-2" href="<?php echo ADMIN_ROOT; ?>/index.php">
-            <i class="fas fa-university me-2"></i>
+            <img src="<?php echo ADMIN_ROOT; ?>/../public/img/Cagayan State University - Logo.png" alt="CSU Logo" height="28" class="d-inline-block align-text-top me-2">
             <?php echo htmlspecialchars($current_campus['name'] ?? 'CSU CMS'); ?>
         </a>
         
@@ -155,20 +183,44 @@ $page_description = $page_description ?? 'CSU CMS Admin Panel';
             <!-- User Dropdown-->
             <li class="nav-item dropdown no-caret dropdown-user me-3 me-lg-4">
                 <a class="btn btn-icon btn-transparent-dark dropdown-toggle" id="navbarDropdownUserImage" href="javascript:void(0);" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                    <img class="img-fluid" src="<?php echo admin_asset_url(ADMIN_IMG_PATH . '/illustrations/profiles/profile-1.png'); ?>" />
+                    <?php if (!empty($current_user['avatar_url']) && file_exists(__DIR__ . '/../../' . $current_user['avatar_url'])): ?>
+                        <img class="img-fluid rounded-2" 
+                             src="<?php echo admin_asset_url('../../' . $current_user['avatar_url']); ?>" 
+                             alt="Profile" 
+                             style="width: 36px; height: 36px; object-fit: cover;" />
+                    <?php else: ?>
+                        <div class="img-fluid rounded-2 bg-primary d-flex align-items-center justify-content-center text-white fw-bold" 
+                             style="width: 36px; height: 36px; font-size: 14px;">
+                            <?php echo strtoupper(substr($current_user['username'], 0, 2)); ?>
+                        </div>
+                    <?php endif; ?>
                 </a>
                 <div class="dropdown-menu dropdown-menu-end border-0 shadow animated--fade-in-up" aria-labelledby="navbarDropdownUserImage">
                     <h6 class="dropdown-header d-flex align-items-center">
-                        <img class="dropdown-user-img" src="<?php echo admin_asset_url(ADMIN_IMG_PATH . '/illustrations/profiles/profile-1.png'); ?>" />
+                        <?php if (!empty($current_user['avatar_url']) && file_exists(__DIR__ . '/../../' . $current_user['avatar_url'])): ?>
+                            <img class="dropdown-user-img rounded-2" 
+                                 src="<?php echo admin_asset_url('../../' . $current_user['avatar_url']); ?>" 
+                                 alt="Profile" 
+                                 style="width: 48px; height: 48px; object-fit: cover;" />
+                        <?php else: ?>
+                            <div class="dropdown-user-img rounded-2 bg-primary d-flex align-items-center justify-content-center text-white fw-bold" 
+                                 style="width: 48px; height: 48px; font-size: 16px;">
+                                <?php echo strtoupper(substr($current_user['username'], 0, 2)); ?>
+                            </div>
+                        <?php endif; ?>
                         <div class="dropdown-user-details">
                             <div class="dropdown-user-details-name"><?php echo htmlspecialchars($current_user['first_name'] . ' ' . $current_user['last_name']); ?></div>
                             <div class="dropdown-user-details-email"><?php echo htmlspecialchars($current_user['email']); ?></div>
                         </div>
                     </h6>
                     <div class="dropdown-divider"></div>
-                    <a class="dropdown-item" href="<?php echo ADMIN_ROOT; ?>/profile.php">
-                        <div class="dropdown-item-icon"><i data-feather="settings"></i></div>
-                        Account
+                    <a class="dropdown-item" href="<?php echo ADMIN_ROOT; ?>/account/profile.php">
+                        <div class="dropdown-item-icon"><i data-feather="user"></i></div>
+                        Profile
+                    </a>
+                    <a class="dropdown-item" href="<?php echo ADMIN_ROOT; ?>/account/change-password.php">
+                        <div class="dropdown-item-icon"><i data-feather="lock"></i></div>
+                        Change Password
                     </a>
                     <a class="dropdown-item" href="<?php echo admin_asset_url('/logout.php'); ?>">
                         <div class="dropdown-item-icon"><i data-feather="log-out"></i></div>
@@ -241,6 +293,36 @@ $page_description = $page_description ?? 'CSU CMS Admin Panel';
                                 <a class="nav-link" href="<?php echo ADMIN_ROOT; ?>/media/upload.php">Upload Media</a>
                             </nav>
                         </div>
+                        
+                        <!-- Widget Management -->
+                        <?php if (is_campus_admin() || is_super_admin()): ?>
+                            <a class="nav-link collapsed" href="javascript:void(0);" data-bs-toggle="collapse" data-bs-target="#collapseWidgetManagement" aria-expanded="false" aria-controls="collapseWidgetManagement">
+                                <div class="nav-link-icon"><i data-feather="grid"></i></div>
+                                Widgets
+                                <div class="sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                            </a>
+                            <div class="collapse" id="collapseWidgetManagement" data-bs-parent="#accordionSidenav">
+                                <nav class="sidenav-menu-nested nav">
+                                    <a class="nav-link" href="<?php echo ADMIN_ROOT; ?>/widgets.php">Manage Widgets</a>
+                                    <a class="nav-link" href="<?php echo ADMIN_ROOT; ?>/carousel.php">Carousel Manager</a>
+                                    <a class="nav-link" href="<?php echo ADMIN_ROOT; ?>/view-widgets.php">View Widgets</a>
+                                </nav>
+                            </div>
+                        <?php endif; ?>
+                        
+                        <!-- Menu Management -->
+                        <?php if (is_campus_admin() || is_super_admin()): ?>
+                            <a class="nav-link collapsed" href="javascript:void(0);" data-bs-toggle="collapse" data-bs-target="#collapseMenuManagement" aria-expanded="false" aria-controls="collapseMenuManagement">
+                                <div class="nav-link-icon"><i data-feather="menu"></i></div>
+                                Menus
+                                <div class="sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                            </a>
+                            <div class="collapse" id="collapseMenuManagement" data-bs-parent="#accordionSidenav">
+                                <nav class="sidenav-menu-nested nav">
+                                    <a class="nav-link" href="<?php echo ADMIN_ROOT; ?>/menus.php">Manage Menus</a>
+                                </nav>
+                            </div>
+                        <?php endif; ?>
                         
                         <?php if (is_campus_admin() || is_super_admin()): ?>
                             <!-- Administration -->

@@ -1,0 +1,137 @@
+/* Widget Styles for Campus CMS */
+
+/* Font Imports for Widgets */
+@import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,200..1000;1,6..12,200..1000&family=Oswald:wght@200..700&family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap');
+
+/* Widget Typography */
+.widget {
+    font-family: 'Nunito Sans', sans-serif;
+}
+
+.widget-title {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 700;
+}
+
+.widget-content,
+.post-excerpt,
+.card-text {
+    font-family: 'Roboto', sans-serif;
+}
+
+.widget .post-title,
+.widget .card-title,
+.featured-posts-widget .featured-main h5,
+.content-widget-posts .post-title {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 700;
+}
+
+/* News Ticker Widget */
+.news-ticker {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    overflow: hidden;
+    position: relative;
+    white-space: nowrap;
+    padding: 10px 0;
+}
+
+.ticker-content {
+    display: inline-block;
+    animation: scroll-left 30s linear infinite;
+}
+
+.ticker-item {
+    margin-right: 50px;
+    display: inline-block;
+}
+
+@keyframes scroll-left {
+    0% {
+        transform: translateX(100%);
+    }
+
+    100% {
+        transform: translateX(-100%);
+    }
+}
+
+/* Featured Posts Widget */
+.featured-posts-widget .featured-main {
+    border-bottom: 2px solid #dee2e6;
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+}
+
+.featured-posts-widget .featured-image img {
+    max-height: 200px;
+    object-fit: cover;
+    width: 100%;
+}
+
+/* Media Widget Posts */
+.media-widget-posts .media-item img {
+    height: 120px;
+    object-fit: cover;
+    width: 100%;
+}
+
+/* Content Widget Posts */
+.content-widget-posts .post-item:last-child {
+    border-bottom: none !important;
+}
+
+.content-widget-posts .post-image img {
+    max-height: 150px;
+    object-fit: cover;
+    width: 100%;
+}
+
+/* Link Widget Posts */
+.link-widget-posts a {
+    color: #0d6efd;
+    font-weight: 500;
+}
+
+.link-widget-posts a:hover {
+    color: #0b5ed7;
+    text-decoration: underline !important;
+}
+
+/* General Widget Styles */
+.widget {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    padding: 1.5rem;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.widget-title {
+    color: #495057;
+    border-bottom: 2px solid #0d6efd;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.widget-content {
+    color: #6c757d;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .media-widget-posts .col-6 {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+
+    .news-ticker {
+        font-size: 0.9rem;
+    }
+
+    .ticker-content {
+        animation-duration: 20s;
+    }
+}

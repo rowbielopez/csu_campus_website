@@ -29,9 +29,8 @@
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
         <div class="container">
-            <a class="navbar-brand fw-bold text-primary" href="#">
-                <i class="fas fa-university me-2"></i>
-                Cagayan State University
+            <a class="navbar-brand" href="#">
+                <img src="public/img/Cagayan State University - Logo.png" alt="CSU Logo" height="40" class="d-inline-block align-text-top">
             </a>
             <div class="navbar-nav ms-auto">
                 <a class="nav-link" href="admin/">Admin Login</a>

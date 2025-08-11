@@ -128,6 +128,15 @@ function redirect_to_login($message = '') {
 }
 
 /**
+ * Require user to be logged in - redirect if not
+ */
+function require_login($message = 'Please log in to access this page.') {
+    if (!is_logged_in()) {
+        redirect_to_login($message);
+    }
+}
+
+/**
  * Get the login URL for the current campus
  */
 function get_login_url() {

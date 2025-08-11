@@ -10,7 +10,7 @@
         .header { background: #1e3a8a; color: white; padding: 20px; text-align: center; }
         .content { padding: 20px; background: #f9f9f9; }
         .credentials { background: white; border: 1px solid #ddd; padding: 15px; margin: 15px 0; }
-        .button { background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 15px 0; }
+        .button { background: #007bff; color: white !important; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 15px 0; }
         .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
     </style>
 </head>

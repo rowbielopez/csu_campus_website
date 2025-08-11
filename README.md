@@ -21,8 +21,9 @@ A unified content management system designed to serve 9 Cagayan State University
 - **Posts/News**: Blog-style content with categories
 - **Events**: Campus event management
 - **Media Library**: File management with campus isolation
+- **Carousel Management**: Full-featured carousel content management with drag-and-drop reordering
 - **Menus**: Custom navigation per campus
-- **Widgets**: Reusable content blocks
+- **Widgets**: Reusable content blocks with image hyperlink support
 - **Users**: Role-based access control per campus
 
 ## 🏫 Campus Domains
@@ -124,9 +125,11 @@ Each campus requires a unique `config/config.php` file with:
 Built with SB Admin Pro 2, featuring:
 - Campus-specific statistics
 - Content management tools
+- **Carousel Management**: Advanced carousel editor with image cropping, drag-and-drop reordering, and live preview
 - User administration
-- Media library
+- Media library with campus isolation
 - Settings management
+- Modern toast notifications
 - Responsive design
 
 ## 🎨 Customization
@@ -139,19 +142,22 @@ Built with SB Admin Pro 2, featuring:
 ## 🔄 Updates & Maintenance
 
 ```bash
-# Update all campuses
-./scripts/deploy.sh update
+# Validate database structure
+./scripts/validate-database.sh
 
-# Update specific campus
-rsync -av --exclude='config/config.php' source/ /var/www/campus_name/
+# Update all campuses (when deployment scripts are available)
+# rsync -av --exclude='config/config.php' source/ /var/www/campus_name/
 ```
+
+**Note**: Frontend build scripts have been removed as this system uses direct PHP templating without Node.js build processes.
 
 ## 📚 Documentation
 
-- [Architecture Overview](ARCHITECTURE.md)
-- [Deployment Guide](scripts/deploy.sh)
-- [Campus Configurations](config/campus-configs/)
 - Database Schema: [schema.sql](database/schema.sql)
+- Database Validation: [validate-database.sh](scripts/validate-database.sh)
+- Campus Configurations: [config/campus-configs/](config/campus-configs/)
+- Email Setup Guide: [EMAIL_SETUP_GUIDE.md](EMAIL_SETUP_GUIDE.md)
+- Login Credentials: [LOGIN_CREDENTIALS.md](LOGIN_CREDENTIALS.md)
 
 ## 🆘 Support
 
@@ -161,8 +167,17 @@ For technical support:
 
 ---
 
-**Version**: 1.0.0  
-**Last Updated**: August 2025  
+**Version**: 1.1.0  
+**Last Updated**: August 11, 2025  
 **Developed by**: CSU IT Department
 
 *Built on SB Admin Pro 2 by Start Bootstrap*
+
+## 🆕 Recent Updates (v1.1.0)
+
+- ✅ **Carousel Management System**: Full-featured carousel content management with drag-and-drop reordering, image cropping, and live preview
+- ✅ **Modern UI**: Replaced alert dialogs with Bootstrap toast notifications
+- ✅ **Image Processing**: Advanced image handling with automatic optimization and thumbnail generation
+- ✅ **Campus-Specific URLs**: Fixed frontend links to use correct campus-specific paths
+- ✅ **Code Cleanup**: Removed unnecessary Node.js build scripts and focused on PHP-only architecture
+- ✅ **Widget System**: Enhanced widget templates with proper error handling and debugging support

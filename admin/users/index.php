@@ -272,10 +272,17 @@ include __DIR__ . '/../layouts/header-new.php';
                                 <td>
                                     <div class="d-flex align-items-center">
                                         <div class="avatar">
-                                            <div class="avatar-img rounded-circle bg-primary d-flex align-items-center justify-content-center text-white fw-bold" 
-                                                 style="width: 40px; height: 40px;">
-                                                <?php echo strtoupper(substr($user['username'], 0, 2)); ?>
-                                            </div>
+                                            <?php if (!empty($user['avatar_url']) && file_exists(__DIR__ . '/../../' . $user['avatar_url'])): ?>
+                                                <img class="avatar-img rounded-3" 
+                                                     src="../../<?php echo htmlspecialchars($user['avatar_url']); ?>" 
+                                                     alt="<?php echo htmlspecialchars($user['username']); ?>" 
+                                                     style="width: 45px; height: 45px; object-fit: cover;">
+                                            <?php else: ?>
+                                                <div class="avatar-img rounded-3 bg-primary d-flex align-items-center justify-content-center text-white fw-bold" 
+                                                     style="width: 45px; height: 45px;">
+                                                    <?php echo strtoupper(substr($user['username'], 0, 2)); ?>
+                                                </div>
+                                            <?php endif; ?>
                                         </div>
                                         <div class="ms-3">
                                             <div class="fw-bold"><?php echo htmlspecialchars($user['username']); ?></div>
@@ -386,6 +393,35 @@ include __DIR__ . '/../layouts/header-new.php';
         </div>
     </div>
 </div>
+
+<style>
+/* Custom avatar styling for rounded rectangle */
+.avatar-img {
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.avatar-img:hover {
+    border-color: rgba(0, 97, 242, 0.3);
+    transform: scale(1.05);
+}
+
+/* Ensure consistent sizing and styling */
+.avatar-img.rounded-3 {
+    border-radius: 8px !important;
+}
+
+/* Default avatar background gradient */
+.avatar-img.bg-primary {
+    background: linear-gradient(135deg, #0061f2 0%, #0056d3 100%);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Profile image styling */
+.avatar-img img, .avatar-img[style*="background"] {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+</style>
 
 <script>
 // Auto-dismiss alerts
